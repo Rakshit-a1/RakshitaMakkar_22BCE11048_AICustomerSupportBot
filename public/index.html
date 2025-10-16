@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI Support — Neon Glass</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #030313;
+        --panel: rgba(18, 20, 34, 0.42);
+        --glass: rgba(255, 255, 255, 0.04);
+        --glass-strong: rgba(255, 255, 255, 0.06);
+        --accent-1: #7a68ff; /* purple */
+        --accent-2: #7affdcc0; /* aqua */
+        --user-bg: linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0.03),
+          rgba(255, 255, 255, 0.02)
+        );
+        --text: #e6f0ff;
+        --muted: #9fb0d6;
+        /* capsule & mask sizing */
+        --capsule-width: min(1100px, calc(100% - 40px));
+        --capsule-height: 64px; /* header & composer identical */
+        --capsule-radius: 999px;
+        --fade-size: 56px; /* mask fade area top/bottom */
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+      }
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial,
+          sans-serif;
+        background: linear-gradient(180deg, #020214 0%, #04041a 100%);
+        color: var(--text);
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      /* App container centers the chat */
+      .app {
+        max-width: 1100px;
+        margin: 0 auto;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        padding: 20px;
+        gap: 18px;
+      }
+
+      /* Floating header capsule - fixed to viewport */
+      header {
+        position: fixed;
+        top: 16px;
+        left: 0;
+        right: 0;
+        display: flex;
+        justify-content: center;
+        pointer-events: none;
+        z-index: 60;
+      }
+      .header-capsule {
+        pointer-events: auto;
+        width: var(--capsule-width);
+        height: var(--capsule-height);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        padding: 0 24px;
+        border-radius: var(--capsule-radius);
+        background: var(--glass-strong);
+        border: 1.5px solid rgba(122, 104, 255, 0.14);
+        backdrop-filter: blur(16px) saturate(140%);
+        -webkit-backdrop-filter: blur(16px) saturate(140%);
+        box-shadow: 0 12px 40px rgba(40, 12, 80, 0.25);
+      }
+
+      /* title styling */
+      .title {
+        font-family: "Orbitron", Inter, sans-serif;
+        font-weight: 700;
+        font-size: 18px;
+        color: var(--text);
+        text-shadow: 0 0 8px rgba(122, 104, 255, 0.95),
+          0 0 22px rgba(122, 104, 255, 0.55);
+      }
+
+      /* chat area stretches under header and composer */
+      .viewport {
+        flex: 1;
+        margin-top: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      .chat-wrap {
+        position: relative;
+        flex: 1;
+        overflow: hidden;
+      }
+
+      /* messages: masked to fade under header and composer */
+      .messages {
+        height: 100%;
+        overflow: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        padding: 20px 20px;
+        scroll-behavior: smooth;
+        -webkit-mask-image: linear-gradient(
+          to bottom,
+          transparent 0%,
+          black var(--fade-size),
+          black calc(100% - var(--fade-size)),
+          transparent 100%
+        );
+        mask-image: linear-gradient(
+          to bottom,
+          transparent 0%,
+          black var(--fade-size),
+          black calc(100% - var(--fade-size)),
+          transparent 100%
+        );
+      }
+
+      .bubble {
+        max-width: min(72ch, 86%);
+        padding: 14px 18px;
+        border-radius: 14px;
+        line-height: 1.45;
+        color: var(--text);
+        transition: transform 0.12s ease, box-shadow 0.12s ease;
+      }
+      .bubble.assistant {
+        align-self: flex-start;
+        background: linear-gradient(
+          180deg,
+          rgba(122, 104, 255, 0.08),
+          rgba(122, 255, 220, 0.03)
+        );
+        border: 1.5px solid rgba(122, 104, 255, 0.22);
+        box-shadow: 0 16px 40px rgba(122, 104, 255, 0.06),
+          0 0 36px rgba(122, 104, 255, 0.06);
+        backdrop-filter: blur(8px);
+      }
+      .bubble.assistant:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 22px 60px rgba(122, 104, 255, 0.14),
+          0 0 80px rgba(122, 104, 255, 0.14);
+      }
+      .bubble.assistant .meta {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 8px;
+      }
+      .bubble.user {
+        align-self: flex-end;
+        background: linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0.03),
+          rgba(255, 255, 255, 0.02)
+        );
+        border: 1.5px solid rgba(255, 255, 255, 0.1);
+        color: #f3f7ff;
+        box-shadow: 0 12px 30px rgba(10, 12, 30, 0.45);
+      }
+      .bubble.user:hover {
+        transform: translateY(-2px);
+      }
+
+      .enter {
+        animation: fadeInUp 0.26s cubic-bezier(0.2, 0.9, 0.3, 1);
+      }
+      @keyframes fadeInUp {
+        from {
+          opacity: 0;
+          transform: translateY(6px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+
+      .streaming {
+        animation: streamPulse 1.4s infinite;
+      }
+      @keyframes streamPulse {
+        0% {
+          filter: brightness(1);
+        }
+        50% {
+          filter: brightness(1.03);
+        }
+        100% {
+          filter: brightness(1);
+        }
+      }
+      .stream-dots {
+        display: inline-flex;
+        gap: 8px;
+        margin-left: 8px;
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--accent-2);
+        box-shadow: 0 0 12px rgba(122, 255, 220, 0.6);
+        animation: dotBlink 1.1s infinite;
+      }
+      .dot:nth-child(2) {
+        animation-delay: 0.16s;
+      }
+      .dot:nth-child(3) {
+        animation-delay: 0.32s;
+      }
+      @keyframes dotBlink {
+        0%,
+        80%,
+        100% {
+          opacity: 0.18;
+        }
+        40% {
+          opacity: 1;
+        }
+      }
+
+      /* bottom composer matches header capsule exactly */
+      .composer-wrap {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 16px;
+        display: flex;
+        justify-content: center;
+        pointer-events: none;
+        z-index: 60;
+      }
+      .composer {
+        pointer-events: auto;
+        width: var(--capsule-width);
+        height: var(--capsule-height);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 0 18px;
+        border-radius: var(--capsule-radius);
+        background: rgba(255, 255, 255, 0.04);
+        border: 1.5px solid rgba(122, 104, 255, 0.14);
+        backdrop-filter: blur(16px) saturate(140%);
+        -webkit-backdrop-filter: blur(16px) saturate(140%);
+        box-shadow: 0 18px 60px rgba(10, 8, 30, 0.5);
+      }
+      .composer input {
+        flex: 1;
+        background: transparent;
+        border: 0;
+        outline: 0;
+        color: var(--text);
+        font-size: 16px;
+        height: calc(var(--capsule-height) - 18px);
+        padding: 8px 12px;
+      }
+      .send {
+        background: linear-gradient(90deg, var(--accent-2), var(--accent-1));
+        color: #051025;
+        border: 0;
+        padding: 10px 14px;
+        border-radius: 12px;
+        cursor: pointer;
+        font-weight: 700;
+      }
+      .send[disabled] {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+
+      .chips {
+        position: absolute;
+        right: 18px;
+        top: 18px;
+        display: flex;
+        gap: 8px;
+      }
+      .chip {
+        background: rgba(20, 25, 50, 0.6);
+        color: var(--text);
+        padding: 8px 12px;
+        border-radius: 12px;
+        border: 1px solid rgba(122, 104, 255, 0.12);
+        cursor: pointer;
+      }
+
+      /* composer-side chip (appears left of send button) */
+      .composer .composer-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-right: 8px;
+      }
+      .composer .composer-chip .chip {
+        padding: 6px 10px;
+        border-radius: 10px;
+        font-size: 13px;
+      }
+
+      @media (max-width: 720px) {
+        :root {
+          --capsule-height: 56px;
+          --fade-size: 48px;
+        }
+        .title {
+          font-size: 15px;
+        }
+        .composer input {
+          font-size: 15px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header>
+        <div class="header-capsule" aria-hidden="true">
+          <div class="title">AI Support Assistant</div>
+        </div>
+      </header>
+
+      <div class="viewport">
+        <div class="chat-wrap">
+          <div
+            class="messages"
+            id="messages"
+            role="log"
+            aria-live="polite"
+          ></div>
+          <div class="chips" id="chips" aria-hidden="true"></div>
+        </div>
+      </div>
+
+      <div class="composer-wrap">
+        <form id="chatForm" class="composer" autocomplete="off">
+          <input
+            id="messageInput"
+            name="message"
+            placeholder="Type your message here..."
+            aria-label="Message input"
+          />
+          <div class="composer-chip" id="composerChip" aria-hidden="true"></div>
+          <button type="submit" class="send" id="sendBtn" aria-label="Send">
+            ➤
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <script type="module">
+      // State
+      let sessionId = null;
+      let streaming = false;
+
+      try {
+        sessionId = localStorage.getItem("ai_support_session") ?? null;
+      } catch (e) {
+        console.warn("localStorage unavailable", e);
+        sessionId = null;
+      }
+
+      const messagesEl = document.getElementById("messages");
+      const chipsEl = document.getElementById("chips");
+      const composerChipEl = document.getElementById("composerChip");
+      const inputEl = document.getElementById("messageInput");
+      const sendBtn = document.getElementById("sendBtn");
+      let bottomSpacerEl = null;
+
+      const ESCALATION_KEYWORDS = [
+        "escalate",
+        "human",
+        "agent",
+        "talk to a human",
+        "cannot resolve",
+        "supervisor",
+        "manager",
+      ];
+
+      async function ensureSession() {
+        if (sessionId) return sessionId;
+        const res = await fetch("/api/sessions", { method: "POST" });
+        const j = await res.json();
+        sessionId = j.id;
+        try {
+          localStorage.setItem("ai_support_session", sessionId);
+        } catch (e) {
+          console.warn("localStorage.setItem failed", e);
+        }
+        return sessionId;
+      }
+
+      function clearChips() {
+        // clear both top-right chips and composer chip
+        if (chipsEl) chipsEl.innerHTML = "";
+        if (composerChipEl) composerChipEl.innerHTML = "";
+      }
+
+      function showEscalationChip() {
+        // prefer composer location (left of send button)
+        if (composerChipEl) {
+          composerChipEl.innerHTML = "";
+          const c = document.createElement("div");
+          c.className = "chip";
+          c.textContent = "Forward to Human Agent";
+          c.addEventListener("click", () => {
+            location.href = "/support";
+          });
+          composerChipEl.appendChild(c);
+          return;
+        }
+        // fallback: top-right chips
+        if (chipsEl) {
+          chipsEl.innerHTML = "";
+          const c = document.createElement("div");
+          c.className = "chip";
+          c.textContent = "Forward to Human Agent";
+          c.addEventListener("click", () => {
+            location.href = "/support";
+          });
+          chipsEl.appendChild(c);
+        }
+      }
+
+      function userIsNearBottom(threshold = 160) {
+        // returns true if user is within `threshold` px of the bottom
+        if (!messagesEl) return true;
+        const distanceFromBottom =
+          messagesEl.scrollHeight -
+          (messagesEl.scrollTop + messagesEl.clientHeight);
+        return distanceFromBottom <= threshold;
+      }
+
+      function scrollToBottom(forceSmooth = false) {
+        if (!messagesEl) return;
+        // if user has scrolled up intentionally, don't yank them down unless forceSmooth is true
+        if (!userIsNearBottom() && !forceSmooth) return;
+        // compute final scroll target (ensure we account for growing content)
+        const target = Math.max(
+          0,
+          messagesEl.scrollHeight - messagesEl.clientHeight
+        );
+        try {
+          if (forceSmooth && typeof messagesEl.scrollTo === "function") {
+            messagesEl.scrollTo({ top: target, behavior: "smooth" });
+          } else {
+            messagesEl.scrollTop = target;
+          }
+        } catch (e) {
+          // fallback and surface any unexpected error for debugging
+          console.warn("scrollToBottom failed, falling back:", e);
+          messagesEl.scrollTop = target;
+        }
+        // ensure final alignment and that the last element is fully visible
+        requestAnimationFrame(() => {
+          const last = messagesEl.lastElementChild;
+          if (last) ensureElementFullyVisible(last);
+        });
+        // small timeout fallback in case layout updates after paint
+        setTimeout(() => {
+          if (messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
+        }, 140);
+      }
+
+      // create a bottom spacer to reserve room for incoming assistant replies
+      (function createBottomSpacer() {
+        if (!messagesEl) return;
+        bottomSpacerEl = document.createElement("div");
+        bottomSpacerEl.id = "bottomSpacer";
+        bottomSpacerEl.style.cssText =
+          "flex:0 0 auto; height:0px; pointer-events:none;";
+        messagesEl.appendChild(bottomSpacerEl);
+      })();
+
+      // Watch for new message nodes or text updates and auto-scroll when they appear.
+      // This ensures streaming updates or rapid appends always bring newest message into view.
+      if (messagesEl && typeof MutationObserver !== "undefined") {
+        const mo = new MutationObserver((mutations) => {
+          let shouldScroll = false;
+          for (const m of mutations) {
+            if (m.type === "childList" && m.addedNodes && m.addedNodes.length) {
+              shouldScroll = true;
+              break;
+            }
+            if (m.type === "characterData") {
+              shouldScroll = true;
+              break;
+            }
+          }
+          if (shouldScroll) {
+            scrollToBottom(true);
+            requestAnimationFrame(() => {
+              const last = messagesEl.lastElementChild;
+              if (last) ensureElementFullyVisible(last);
+            });
+          }
+        });
+        mo.observe(messagesEl, {
+          childList: true,
+          subtree: true,
+          characterData: true,
+        });
+      }
+
+      // Ensure an element inside the messages container is fully visible (not clipped)
+      function ensureElementFullyVisible(el) {
+        if (!messagesEl || !el) return;
+        const containerRect = messagesEl.getBoundingClientRect();
+        const elRect = el.getBoundingClientRect();
+        const paddingTop =
+          Number.parseInt(getComputedStyle(messagesEl).paddingTop || "0", 10) ||
+          0;
+        const paddingBottom =
+          Number.parseInt(
+            getComputedStyle(messagesEl).paddingBottom || "0",
+            10
+          ) || 0;
+        // visible area within the container
+        const visibleTop = containerRect.top + paddingTop;
+        const visibleBottom = containerRect.bottom - paddingBottom;
+
+        if (elRect.bottom > visibleBottom) {
+          // element clipped at bottom -> scroll down just enough
+          const overlap = elRect.bottom - visibleBottom + 8; // small margin
+          messagesEl.scrollTop = Math.min(
+            messagesEl.scrollHeight,
+            messagesEl.scrollTop + overlap
+          );
+        } else if (elRect.top < visibleTop) {
+          // element clipped at top -> scroll up
+          const overlap = visibleTop - elRect.top + 8;
+          messagesEl.scrollTop = Math.max(0, messagesEl.scrollTop - overlap);
+        }
+      }
+
+      function adjustMessagesPadding() {
+        const header = document.querySelector("header");
+        const composerWrap = document.querySelector(".composer-wrap");
+        if (!messagesEl) return;
+        const topPad = header
+          ? Math.round(header.getBoundingClientRect().bottom + 8)
+          : 24;
+        const bottomPad = composerWrap
+          ? Math.round(composerWrap.getBoundingClientRect().height + 12)
+          : 120;
+        messagesEl.style.paddingTop = topPad + "px";
+        messagesEl.style.paddingBottom = bottomPad + "px";
+      }
+
+      function addMsg(role, content = "", opts = {}) {
+        const div = document.createElement("div");
+        div.className = "bubble " + role + " enter";
+        if (role === "assistant" && opts.streaming)
+          div.classList.add("streaming");
+        const inner = document.createElement("div");
+        inner.className = "content";
+        if (opts.html) {
+          inner.innerHTML = content;
+        } else {
+          inner.textContent = content;
+        }
+        div.appendChild(inner);
+        if (opts.streaming) {
+          const dots = document.createElement("span");
+          dots.className = "stream-dots";
+          dots.innerHTML =
+            '<span class="dot"></span><span class="dot"></span><span class="dot"></span>';
+          inner.appendChild(dots);
+        }
+        messagesEl.appendChild(div);
+        // If this is a streaming assistant reply, start a short interval to
+        // continuously follow growth of the response. This ensures autoscroll
+        // follows the reply as it expands (useful for streaming updates).
+        if (opts.streaming && role === "assistant") {
+          try {
+            // clear existing if any just in case
+            if (div.dataset._streamScrollId) {
+              const prev = Number(div.dataset._streamScrollId);
+              clearInterval(prev);
+            }
+            const id = setInterval(() => {
+              if (!messagesEl) return;
+              messagesEl.scrollTop = messagesEl.scrollHeight;
+            }, 120);
+            div.dataset._streamScrollId = String(id);
+            // also perform an immediate smooth scroll to seed the position
+            scrollToBottom(true);
+          } catch (e) {
+            console.warn("start streaming scroll interval failed", e);
+            scrollToBottom(true);
+          }
+        } else {
+          scrollToBottom(true);
+        }
+        return div;
+      }
+
+      function setStreaming(v) {
+        streaming = v;
+        if (sendBtn) sendBtn.disabled = v;
+      }
+
+      function updateMsgEl(el, text) {
+        const inner = el.querySelector(".content");
+        if (!inner) return;
+        const dots = inner.querySelector(".stream-dots");
+        if (dots) dots.remove();
+        inner.textContent = text;
+        // if this was an assistant bubble, collapse reserved spacer after final update
+        if (el.classList.contains("assistant") && bottomSpacerEl) {
+          bottomSpacerEl.style.height = "0px";
+        }
+        // Clear any streaming-follow interval created when the bubble was added
+        if (el.dataset && el.dataset._streamScrollId) {
+          try {
+            clearInterval(Number(el.dataset._streamScrollId));
+          } catch (e) {
+            console.warn("clearInterval failed for stream scroll id", e);
+          }
+          delete el.dataset._streamScrollId;
+        }
+        // Final scroll to ensure fully visible
+        scrollToBottom(true);
+      }
+
+      function containsEscalation(text) {
+        if (!text) return false;
+        const t = text.toLowerCase();
+        return ESCALATION_KEYWORDS.some((k) => t.includes(k));
+      }
+
+      async function sendMessage(text) {
+        if (streaming) return;
+        setStreaming(true);
+        await ensureSession();
+        addMsg("user", text);
+        const assistantEl = addMsg("assistant", "Thinking...", {
+          streaming: true,
+        });
+        // reserve extra space so the eventual assistant reply can be fully visible
+        if (bottomSpacerEl) {
+          // 360px is an empirical safe reserve; adjust if needed for your layout
+          bottomSpacerEl.style.height = "360px";
+          scrollToBottom(true);
+        }
+        // allow typing while streaming
+        inputEl.removeAttribute("disabled");
+        inputEl.focus();
+        try {
+          const res = await fetch("/api/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sessionId, message: text }),
+          });
+          const json = await res.json();
+          const reply = json && json.reply ? json.reply : "Sorry, no response.";
+          updateMsgEl(assistantEl, reply);
+          assistantEl.classList.remove("streaming");
+          if ((json && json.suggestedEscalation) || containsEscalation(reply)) {
+            showEscalationChip();
+          } else {
+            clearChips();
+          }
+        } catch (err) {
+          console.error("chat error", err);
+          updateMsgEl(assistantEl, "Sorry, I could not reach the assistant.");
+          assistantEl.classList.remove("streaming");
+          clearChips();
+          if (bottomSpacerEl) bottomSpacerEl.style.height = "0px";
+        } finally {
+          inputEl.focus();
+          setStreaming(false);
+        }
+      }
+
+      document
+        .getElementById("chatForm")
+        .addEventListener("submit", async function (e) {
+          e.preventDefault();
+          if (streaming) return;
+          const val = inputEl.value.trim();
+          if (!val) return;
+          inputEl.value = "";
+          await sendMessage(val);
+        });
+
+      // initialization
+      clearChips();
+      await ensureSession();
+      adjustMessagesPadding();
+      addMsg(
+        "assistant",
+        "Hello! I'm your AI support assistant. How can I help you today?"
+      );
+      scrollToBottom(true);
+      inputEl.focus();
+
+      // keep layout and scroll in sync
+      globalThis.addEventListener("resize", function () {
+        adjustMessagesPadding();
+        scrollToBottom();
+      });
+      new ResizeObserver(function () {
+        adjustMessagesPadding();
+        scrollToBottom();
+      }).observe(document.body);
+      globalThis.addEventListener("keydown", function (e) {
+        if (e.key === "/") {
+          e.preventDefault();
+          inputEl.focus();
+        }
+      });
+    </script>
+  </body>
+</html>
